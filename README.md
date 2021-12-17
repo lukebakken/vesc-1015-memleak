@@ -1,7 +1,7 @@
 To reproduce memory leak on `win32` systems:
 
 * Install Erlang 23.1.5 and 23.2 to the default `C:\Program Files` location.
-* Run this command. It will not reproduce the leak in any case:
+* Run these commands. Neither will reproduce the leak:
     ```
     .\run.ps1 -erlang_version '23.1.5' -leak $false
     .\run.ps1 -erlang_version '23.1.5' -leak $true
