@@ -4,4 +4,4 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 'Latest' -ErrorAction 'Stop'  -Verbose
 
 & "$erlang_install_base\erl-$erlang_version\bin\erlc.exe" +debug .\repro.erl
-& "$erlang_install_base\erl-$erlang_version\bin\erl.exe" -noinput -noshell -leak $leak -eval 'repro:run(1024), init:stop().'
+& "$erlang_install_base\erl-$erlang_version\bin\erl.exe" -noinput -noshell -leak $leak -eval 'repro:run(5000), init:stop().'
