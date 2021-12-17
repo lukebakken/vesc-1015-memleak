@@ -2,6 +2,8 @@
 
 -export([run/1, run/2]).
 
+-include_lib("kernel/include/file.hrl").
+
 -record(plugin, {name,             %% atom()
                  version,          %% string()
                  description,      %% string()
@@ -20,18 +22,21 @@
                 }).
 
 run(Iterations) when is_integer(Iterations) ->
-    run("C:/Users/bakkenl/issues/rmq-server/rabbitmq_server-3.9.11/plugins", Iterations).
+    run("./plugins", Iterations).
 
-run(RmqDir, Iterations) when is_integer(Iterations) ->
+run(Dir, Iterations) when is_integer(Iterations) ->
+    InitArgs = init:get_arguments(),
+    ShouldLeak = parse_leak_arg(proplists:get_value(leak, InitArgs, "True")),
+    Apps = list_free_apps([Dir]),
+    % io:format("Args ~p ShouldLeak ~p~n", [InitArgs, ShouldLeak]).
     F = fun (_I) ->
-                % io:format("I ~p~n", [I]),
-                Apps = list_free_apps([RmqDir]),
-                % io:format("Apps:~n~p~n", [Apps]),
-                _Infos = read_plugins_info(Apps, {[], []}) % ,
-                % io:format("Infos:~n~p~n", [Infos])
-                % timer:sleep(250)
+        _Infos = read_plugins_info(ShouldLeak, Apps, {[], []})
     end,
     lists:foreach(F, lists:seq(0, Iterations)).
+
+parse_leak_arg(["True"]) -> true;
+parse_leak_arg(["False"]) -> false;
+parse_leak_arg(_) -> true.
 
 %% Returns list of all files that look like OTP applications in a
 %% given set of directories.
@@ -45,19 +50,18 @@ list_free_apps([Dir|Rest]) ->
 full_path_wildcard(Glob, Dir) ->
     [filename:join([Dir, File]) || File <- filelib:wildcard(Glob, Dir)].
 
-read_plugins_info([], Acc) ->
+read_plugins_info(_ShouldLeak, [], Acc) ->
     Acc;
-read_plugins_info([Path|Paths], {Plugins, Problems}) ->
-    case plugin_info(Path) of
+read_plugins_info(ShouldLeak, [Path|Paths], {Plugins, Problems}) ->
+    case plugin_info(ShouldLeak, Path) of
         #plugin{} = Plugin ->
-            read_plugins_info(Paths, {[Plugin|Plugins], Problems});
+            read_plugins_info(ShouldLeak, Paths, {[Plugin|Plugins], Problems});
         {error, Location, Reason} ->
-            read_plugins_info(Paths, {Plugins, [{Location, Reason}|Problems]})
+            read_plugins_info(ShouldLeak, Paths, {Plugins, [{Location, Reason}|Problems]})
     end.
 
-plugin_info({app, App}) ->
-    % LRB TODO case rabbit_file:read_term_file(App) of
-    case read_term_file(App) of
+plugin_info(ShouldLeak, {app, App}) ->
+    case read_term_file(ShouldLeak, App) of
         {ok, [{application, Name, Props}]} ->
             mkplugin(Name, Props, dir,
                      filename:absname(
@@ -77,9 +81,26 @@ mkplugin(Name, Props, Type, Location) ->
             broker_version_requirements = BrokerVersions,
             dependency_version_requirements = DepsVersions}.
 
-read_term_file(File) ->
+read_term_file(_ShouldLeak=false,File) ->
     try
-        %% {ok, Data} = with_handle(fun () -> prim_file:read_file(File) end),
+        {ok, FInfo} = file:read_file_info(File, [raw]),
+        {ok, Fd} = file:open(File, [read, raw, binary]),
+        try
+            {ok, Data} = file:read(Fd, FInfo#file_info.size),
+            {ok, Tokens, _} = erl_scan:string(binary_to_list(Data)),
+            TokenGroups = group_tokens(Tokens),
+            {ok, [begin
+                    {ok, Term} = erl_parse:parse_term(Tokens1),
+                    Term
+                end || Tokens1 <- TokenGroups]}
+        after
+            ok = file:close(Fd)
+        end
+    catch
+        error:{badmatch, Error} -> Error
+    end;
+read_term_file(_ShouldLeak=true,File) ->
+    try
         {ok, Data} = file:read_file(File),
         {ok, Tokens, _} = erl_scan:string(binary_to_list(Data)),
         TokenGroups = group_tokens(Tokens),
