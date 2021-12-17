@@ -1,6 +1,6 @@
 -module(repro).
 
--export([run/2]).
+-export([run/1, run/2]).
 
 -record(plugin, {name,             %% atom()
                  version,          %% string()
@@ -19,11 +19,16 @@
                  extra_dependencies %% string()
                 }).
 
+run(Iterations) when is_integer(Iterations) ->
+    run("C:/Users/bakkenl/issues/rmq-server/rabbitmq_server-3.9.11/plugins", Iterations).
+
 run(RmqDir, Iterations) when is_integer(Iterations) ->
-    F = fun (I) ->
-                io:format("I ~p~n", [I]),
+    F = fun (_I) ->
+                % io:format("I ~p~n", [I]),
                 Apps = list_free_apps([RmqDir]),
+                % io:format("Apps:~n~p~n", [Apps]),
                 _Infos = read_plugins_info(Apps, {[], []}) % ,
+                % io:format("Infos:~n~p~n", [Infos])
                 % timer:sleep(250)
     end,
     lists:foreach(F, lists:seq(0, Iterations)).
