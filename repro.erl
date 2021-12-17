@@ -23,8 +23,8 @@ run(RmqDir, Iterations) when is_integer(Iterations) ->
     F = fun (I) ->
                 io:format("I ~p~n", [I]),
                 Apps = list_free_apps([RmqDir]),
-                _Infos = read_plugins_info(Apps, {[], []}),
-                timer:sleep(1000)
+                _Infos = read_plugins_info(Apps, {[], []}) % ,
+                % timer:sleep(250)
     end,
     lists:foreach(F, lists:seq(0, Iterations)).
 
