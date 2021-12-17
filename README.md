@@ -1,3 +1,13 @@
+### Summary
+
+While investigating a RabbitMQ customer memory leak on Windows systems I
+narrowed down the leak to the code included in this repository. The repeated
+reads of `.app` files into memory via `file:read_file/1` is the source of the
+leak. Skipping the file server (and thus `prim_file`) avoids the leak. Using
+`prim_file:read_file/1` directly also exhibits the leak.
+
+### Reproduction
+
 To reproduce memory leak on `win32` systems:
 
 * Install Erlang 23.1.5 and 23.2 to the default `C:\Program Files` location.
@@ -30,4 +40,7 @@ Right-click `Performance Monitor` and select `Properties`. Use these settings:
 You should now see a red line graph being drawn showing "Private Bytes" usage
 for the `erl.exe` process. During the leak scenarios, it will go up quickly.
 
-Note that you will not have to "rebuild" the performance monitor settings from one `erl.exe` run to the next. It will pick up the first `erl.exe` process running on the system. Note though that if you have other `erl.exe` processes running you have to be sure to select the correct one.
+Note that you will not have to "rebuild" the performance monitor settings from
+one `erl.exe` run to the next. It will pick up the first `erl.exe` process
+running on the system. Note though that if you have other `erl.exe` processes
+running you have to be sure to select the correct one.
